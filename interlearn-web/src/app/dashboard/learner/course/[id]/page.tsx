@@ -2,8 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, Play, Pause, Maximize, Volume2, VolumeX, Settings, CheckCircle2, Activity, Sparkles, Globe2, FileText, Headphones, BookOpen, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { 
+  ArrowLeft, Play, Pause, Maximize, Volume2, VolumeX, Settings, 
+  CheckCircle2, Activity, Sparkles, Globe2, FileText, Headphones, 
+  BookOpen, ChevronLeft, ChevronRight, AlertCircle, ThumbsUp, Wallet, Coins 
+} from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 const mockCourses = {
   "1": {
@@ -11,6 +16,7 @@ const mockCourses = {
     instructor: "Alex Chen",
     type: "video",
     rate: 0.12,
+    available: true,
     modules: [
       { id: 1, title: "Introduction to Advanced Types", duration: "12:14" },
       { id: 2, title: "Utility Types Masterclass", duration: "18:45" },
@@ -22,6 +28,7 @@ const mockCourses = {
     instructor: "Sarah Doe",
     type: "ebook",
     rate: 0.05,
+    available: true,
     modules: [
       { id: 1, title: "Systems Thinking", duration: "10 mins read" },
       { id: 2, title: "Layout Architecture", duration: "20 mins read" },
@@ -33,16 +40,41 @@ const mockCourses = {
     instructor: "Y Combinator",
     type: "audio",
     rate: 0.02,
+    available: true,
     modules: [
       { id: 1, title: "How to Build the Future", duration: "45:20" },
       { id: 2, title: "Finding Product Market Fit", duration: "38:10" },
       { id: 3, title: "Scaling your team", duration: "52:05" }
     ]
+  },
+  "4": {
+    title: "Advanced Rust Web Services",
+    instructor: "Dr. Evelyn Foster",
+    type: "video",
+    rate: 0.15,
+    available: false,
+    expectedRelease: "July 2026",
+    initialRequests: 42,
+    targetRequests: 100,
+    description: "Build ultra-fast, memory-safe APIs and microservices using Actix-Web, Axum, and Sqlx."
+  },
+  "5": {
+    title: "Zero to One: Product Strategy",
+    instructor: "Peter Thiel (Guest)",
+    type: "ebook",
+    rate: 0.08,
+    available: false,
+    expectedRelease: "August 2026",
+    initialRequests: 18,
+    targetRequests: 50,
+    description: "Learn how to build companies that create new things, going from 0 to 1 rather than 1 to n."
   }
 };
 
 export default function CoursePlayerPage() {
   const params = useParams();
+  const router = useRouter();
+  const { t, language } = useLanguage();
   const id = params?.id as string;
   const course = mockCourses[id as keyof typeof mockCourses] || mockCourses["1"];
 
@@ -51,18 +83,108 @@ export default function CoursePlayerPage() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const mediaRef = course.type === 'audio' ? audioRef : videoRef;
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false); // Default to unmuted, but we will ensure the video plays
+  const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [language, setLanguage] = useState("Original (English)");
+  const [playerLanguage, setPlayerLanguage] = useState("Original (English)");
 
-  // Ebook Pagination State
+  // Ebook Pagination & Slow Reader States
   const [currentPage, setCurrentPage] = useState(0);
   const [visitedPages, setVisitedPages] = useState<number[]>([]);
   const isPageNew = !visitedPages.includes(currentPage);
+  
+  // Slow Reader: Activity / Idle Tracker (15s inactivity triggers idle)
+  const [isReaderIdle, setIsReaderIdle] = useState(false);
+  const activityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Slow Reader: Cost Capping (track active billable seconds on current page)
+  const [pageBilledSeconds, setPageBilledSeconds] = useState<Record<number, number>>({});
+  const isPageCostCapped = (pageBilledSeconds[currentPage] || 0) >= 45;
 
   // Media High-Water Mark State (for skipping/rewinding)
   const [highestTimeReached, setHighestTimeReached] = useState(0);
   const isMediaReplaying = mediaRef.current ? mediaRef.current.currentTime < highestTimeReached - 0.5 : false;
+
+  // Monetization State
+  const [streamedSeconds, setStreamedSeconds] = useState(0);
+  const ratePerSecond = course.rate / 60; 
+  const totalStreamed = streamedSeconds * ratePerSecond;
+
+  // Pre-Release Interactive states
+  const [votes, setVotes] = useState<number>(course.available ? 0 : (course as any).initialRequests);
+  const [hasVoted, setHasVoted] = useState(false);
+  const [isPledging, setIsPledging] = useState(false);
+  const [pledgedAmount, setPledgedAmount] = useState<number>(12.50);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const voted = localStorage.getItem(`rheodemy_requested_${id}`);
+      if (voted) {
+        setHasVoted(true);
+        setVotes((course as any).initialRequests + 1);
+      }
+    }
+  }, [id, course]);
+
+  // Simulated Escrow Pledge stream
+  useEffect(() => {
+    let pledgeInterval: NodeJS.Timeout;
+    if (isPledging) {
+      pledgeInterval = setInterval(() => {
+        setPledgedAmount(prev => prev + 0.05);
+      }, 500);
+    }
+    return () => clearInterval(pledgeInterval);
+  }, [isPledging]);
+
+  // Ebook Slow Reader Activity Listeners
+  const resetActivityTimer = () => {
+    setIsReaderIdle(false);
+    if (activityTimerRef.current) {
+      clearTimeout(activityTimerRef.current);
+    }
+    activityTimerRef.current = setTimeout(() => {
+      setIsReaderIdle(true);
+    }, 15000); // 15 seconds idle timeout
+  };
+
+  useEffect(() => {
+    if (course.type === 'ebook' && isPlaying && !isPageCostCapped && isPageNew) {
+      // Initialize activity listeners
+      resetActivityTimer();
+      window.addEventListener('mousemove', resetActivityTimer);
+      window.addEventListener('scroll', resetActivityTimer, true);
+      window.addEventListener('keydown', resetActivityTimer);
+      window.addEventListener('click', resetActivityTimer);
+
+      return () => {
+        if (activityTimerRef.current) {
+          clearTimeout(activityTimerRef.current);
+        }
+        window.removeEventListener('mousemove', resetActivityTimer);
+        window.removeEventListener('scroll', resetActivityTimer, true);
+        window.removeEventListener('keydown', resetActivityTimer);
+        window.removeEventListener('click', resetActivityTimer);
+      };
+    }
+  }, [isPlaying, currentPage, isPageCostCapped, isPageNew, course.type]);
+
+  // Ebook billing increment interval
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying && course.type === 'ebook' && isPageNew && !isPageCostCapped && !isReaderIdle) {
+      interval = setInterval(() => {
+        setStreamedSeconds(prev => prev + 1);
+        setProgress(prev => Math.min(prev + 0.22, 100)); // fake progress for page
+        
+        // Track page billed time
+        setPageBilledSeconds(prev => ({
+          ...prev,
+          [currentPage]: (prev[currentPage] || 0) + 1
+        }));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, course.type, currentPage, isPageNew, isPageCostCapped, isReaderIdle]);
 
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -74,23 +196,6 @@ export default function CoursePlayerPage() {
       }
     }
   };
-
-  // Monetization State
-  const [streamedSeconds, setStreamedSeconds] = useState(0);
-  const ratePerSecond = course.rate / 60; 
-  const totalStreamed = streamedSeconds * ratePerSecond;
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    // Meter ONLY runs if playing, is an ebook, AND the page hasn't been read before
-    if (isPlaying && course.type === 'ebook' && isPageNew) {
-      interval = setInterval(() => {
-        setStreamedSeconds(prev => prev + 1);
-        setProgress(prev => Math.min(prev + 0.1, 100)); // fake progress for ebook
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, course.type, currentPage, visitedPages, isPageNew]);
 
   const togglePlay = () => {
     if (course.type === 'ebook') {
@@ -109,7 +214,6 @@ export default function CoursePlayerPage() {
             setIsPlaying(true);
           }).catch(error => {
             console.error("Video playback failed:", error);
-            // If autoplay policy blocks it, muting it usually fixes it instantly.
             if (mediaRef.current) {
                mediaRef.current.muted = true;
                setIsMuted(true);
@@ -137,7 +241,7 @@ export default function CoursePlayerPage() {
       const duration = mediaRef.current.duration;
       setProgress((current / duration) * 100);
       
-      // High-Water Mark Logic: Only increase streamedSeconds if they are in "new" territory
+      // High-Water Mark Logic: Only charge for new sections
       if (current > highestTimeReached) {
         setHighestTimeReached(current);
         setStreamedSeconds(Math.floor(current));
@@ -147,7 +251,7 @@ export default function CoursePlayerPage() {
 
   const ebookPages = [
     (
-      <div key="p1">
+      <div key="p1" className="space-y-6">
         <div className="border-b border-black/10 pb-8 mb-8">
           <h1 className="text-4xl font-bold font-serif mb-4 text-black">{course.title}</h1>
           <div className="flex items-center gap-4 text-sm text-black/60">
@@ -156,25 +260,39 @@ export default function CoursePlayerPage() {
             <span>Published 2026</span>
           </div>
         </div>
-        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A] mb-6">Welcome to the definitive guide. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-        <div className="p-8 bg-black/5 rounded-2xl border-l-4 border-primary my-10">
-          <p className="text-2xl italic font-serif text-black leading-snug">"Design is not just what it looks like and feels like. Design is how it works."</p>
+        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A]">
+          Welcome to the definitive guide on systems thinking and layouts. To properly model and monetize content, Rheodemy utilizes standard Interledger payment channels. The streaming API bills you per second. Slow readers or those who get distracted are fully protected:
+        </p>
+        <div className="p-8 bg-black/5 rounded-2xl border-l-4 border-primary my-8">
+          <p className="text-xl italic font-serif text-black leading-snug">
+            "We believe knowledge should be accessible, and pricing models should be strictly aligned with consumption. That is why slow readers are capped at 45 seconds of streaming billing per page, and idle readers are paused immediately."
+          </p>
         </div>
-        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A]">Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A]">
+          If you remain inactive (no scrolling, typing, or moving the cursor) for 15 seconds, the meter will auto-pause. Try it on this page!
+        </p>
       </div>
     ),
     (
-      <div key="p2">
+      <div key="p2" className="space-y-6">
         <h2 className="text-2xl font-bold font-serif mt-4 mb-6 text-black">The Foundations of Systems</h2>
-        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A] mb-6">Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.</p>
-        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A] mb-6">Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A]">
+          Systems layout architecture deals with visual grids and structural constraints. In next-generation styling, standard flex properties dictate how layers adapt. By using clean CSS variables and Tailwind utility maps, we ensure screens remain fully responsive across desktop, tablet, and mobile configurations.
+        </p>
+        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A]">
+          Web Monetization is a critical cog in this wheel. Unlike traditional subscriptions where users are locked into flat monthly fees, Interledger streams microcent fractions to creators in real time, shifting the economics of content marketplaces.
+        </p>
       </div>
     ),
     (
-      <div key="p3">
+      <div key="p3" className="space-y-6">
         <h2 className="text-2xl font-bold font-serif mt-4 mb-6 text-black">Rapid Prototyping</h2>
-        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A] mb-6">At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident.</p>
-        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A] mb-6">Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus.</p>
+        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A]">
+          A high-fidelity prototype bridges the gap between design concepts and fully tested code. By simulating backend states (like voting queues and escrow escrow pots in local client storage), engineers can present stakeholders with comprehensive product demonstrations before writing a single line of backend APIs.
+        </p>
+        <p className="text-lg leading-relaxed font-serif text-[#2A2A2A]">
+          Thank you for reading this Handbook! All features are fully functional inside this Rheodemy MVP release.
+        </p>
       </div>
     )
   ];
@@ -186,6 +304,7 @@ export default function CoursePlayerPage() {
     }
     if (currentPage < ebookPages.length - 1) {
       setCurrentPage(prev => prev + 1);
+      resetActivityTimer();
     }
   };
 
@@ -196,11 +315,178 @@ export default function CoursePlayerPage() {
     }
     if (currentPage > 0) {
       setCurrentPage(prev => prev - 1);
+      resetActivityTimer();
     }
   };
 
+  // Pre-Release Voting handlers
+  const handleVote = () => {
+    if (!hasVoted) {
+      setVotes(prev => prev + 1);
+      setHasVoted(true);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`rheodemy_requested_${id}`, 'true');
+      }
+    }
+  };
+
+  const togglePledge = () => {
+    setIsPledging(!isPledging);
+  };
+
+  // Render Pre-Release request hub if course is not available
+  if (!course.available) {
+    const progressPercent = Math.min((votes / (course as any).targetRequests) * 100, 100);
+    const pledgePercent = Math.min((pledgedAmount / 50.00) * 100, 100);
+
+    return (
+      <div className="min-h-screen bg-[#050505] text-foreground flex flex-col relative z-10 font-sans">
+        {/* Ambient background glows */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+
+        {/* Top Header */}
+        <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-black/50 backdrop-blur-md sticky top-0 z-40">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/learner" className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors">
+              <ArrowLeft className="w-4 h-4 text-muted hover:text-foreground transition-colors" />
+            </Link>
+            <div className="h-4 w-px bg-white/10" />
+            <h1 className="font-medium text-sm text-foreground truncate max-w-sm">{course.title}</h1>
+          </div>
+          <div className="bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+            {t.preRelease}
+          </div>
+        </header>
+
+        {/* Main interactive request container */}
+        <main className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 relative z-10 max-w-4xl mx-auto w-full">
+          <div className="glass w-full p-8 md:p-12 rounded-[2.5rem] border border-white/10 space-y-10 shadow-2xl shadow-black relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+            
+            {/* Creator info & Header */}
+            <div className="space-y-4 text-center">
+              <span className="text-xs uppercase tracking-widest text-primary font-bold">{t.preReleaseCourse}</span>
+              <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight">{course.title}</h2>
+              <p className="text-sm text-muted max-w-lg mx-auto leading-relaxed">{(course as any).description}</p>
+              
+              <div className="flex items-center justify-center gap-4 text-xs text-muted/80 pt-2">
+                <span>By <strong className="text-foreground">{course.instructor}</strong></span>
+                <span>•</span>
+                <span>Expected: <strong className="text-foreground">{(course as any).expectedRelease}</strong></span>
+                <span>•</span>
+                <span>Format: <strong className="text-foreground uppercase">{course.type}</strong></span>
+              </div>
+            </div>
+
+            {/* Voting & Funding splits grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+              
+              {/* Box 1: Upvoting / Demand check */}
+              <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 space-y-6 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <h4 className="font-bold text-sm text-foreground uppercase tracking-wider flex items-center gap-2">
+                    <ThumbsUp className="w-4 h-4 text-primary" />
+                    {t.awaitingRelease}
+                  </h4>
+                  <p className="text-xs text-muted leading-relaxed">
+                    {t.preReleaseDesc}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Progress bar */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-mono text-muted">
+                      <span>Requests: {votes} / {(course as any).targetRequests}</span>
+                      <span>{progressPercent.toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full bg-white/5 h-2.5 rounded-full overflow-hidden border border-white/5">
+                      <div className="bg-primary h-full rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleVote}
+                    disabled={hasVoted}
+                    className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer
+                      ${hasVoted 
+                        ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
+                        : 'bg-primary text-black hover:opacity-90 hover:scale-[1.02]'
+                      }
+                    `}
+                  >
+                    {hasVoted ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        {t.courseRequested}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        {t.requestCourse}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Box 2: Escrow pre-funding pledges */}
+              <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 space-y-6 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <h4 className="font-bold text-sm text-foreground uppercase tracking-wider flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-purple-400 animate-pulse" />
+                    {t.pledgedAmount}
+                  </h4>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Pledge microcent transactions from your active wallet. Funds reside in an escrow contract and return to you if publication fails.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Progress Bar */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-mono text-muted">
+                      <span>Escrow: ${pledgedAmount.toFixed(2)} / $50.00</span>
+                      <span>{pledgePercent.toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full bg-white/5 h-2.5 rounded-full overflow-hidden border border-white/5">
+                      <div className="bg-purple-500 h-full rounded-full transition-all duration-500" style={{ width: `${pledgePercent}%` }} />
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={togglePledge}
+                    className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer
+                      ${isPledging 
+                        ? 'bg-purple-500 text-white animate-pulse' 
+                        : 'bg-white/5 border border-white/10 hover:bg-white/10 text-foreground'
+                      }
+                    `}
+                  >
+                    {isPledging ? (
+                      <>
+                        <Activity className="w-4 h-4 text-white animate-spin" />
+                        Pledging Stream active...
+                      </>
+                    ) : (
+                      <>
+                        <Coins className="w-4 h-4 text-purple-400" />
+                        {t.pledgeFund}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#050505] text-foreground flex flex-col relative z-10">
+    <div className="min-h-screen bg-[#050505] text-foreground flex flex-col relative z-10 font-sans">
       
       {/* Cinematic Top Bar */}
       <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-black/50 backdrop-blur-md sticky top-0 z-40">
@@ -214,7 +500,7 @@ export default function CoursePlayerPage() {
 
         {/* Unobtrusive Monetization Tracker */}
         <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-full px-4 py-1.5 shadow-[0_0_15px_rgba(0,212,200,0.05)]">
-          <div className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-primary animate-pulse shadow-[0_0_8px_rgba(0,212,200,0.8)]' : 'bg-muted'}`} />
+          <div className={`w-1.5 h-1.5 rounded-full ${isPlaying && !isReaderIdle ? 'bg-primary animate-pulse shadow-[0_0_8px_rgba(0,212,200,0.8)]' : 'bg-muted'}`} />
           <span className="text-xs font-mono text-primary flex items-center gap-1.5">
             Streaming ILP <span className="opacity-50">|</span> ${totalStreamed.toFixed(4)}
           </span>
@@ -241,7 +527,6 @@ export default function CoursePlayerPage() {
 
             {course.type === 'audio' && (
               <div className="w-full h-full bg-[#111] flex flex-col items-center justify-center relative">
-                {/* Using a reliable HTTPS MP3 for audio demonstration */}
                 <audio 
                   ref={audioRef}
                   src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
@@ -265,23 +550,42 @@ export default function CoursePlayerPage() {
                 {/* Paused Overlay */}
                 {!isPlaying && (
                   <div className="absolute inset-0 bg-[#FAFAFA]/60 backdrop-blur-sm flex items-center justify-center z-20">
-                    <button onClick={togglePlay} className="bg-primary text-primary-foreground px-8 py-4 rounded-xl font-bold flex items-center gap-3 hover:scale-105 transition-transform shadow-2xl">
-                       <BookOpen className="w-6 h-6" /> Start Reading (Meter Starts)
+                    <button onClick={togglePlay} className="bg-primary text-primary-foreground px-8 py-4 rounded-xl font-bold flex items-center gap-3 hover:scale-105 transition-transform shadow-2xl cursor-pointer">
+                       <BookOpen className="w-6 h-6" /> {t.startReading}
                     </button>
                   </div>
                 )}
 
-                {/* Floating Pause Button & Status when active */}
+                {/* Floating State Indicators (Slow Reader Protection Alert Panels) */}
                 {isPlaying && (
-                  <div className="absolute bottom-6 right-8 z-30 flex items-center gap-4">
-                    {!isPageNew && (
-                      <div className="bg-white text-black px-4 py-2 rounded-full border border-black/10 shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                        <span className="text-sm font-medium">Re-reading (Meter Paused)</span>
+                  <div className="absolute bottom-6 right-8 z-30 flex flex-col gap-2 items-end">
+                    
+                    {/* 1. Idle Notice */}
+                    {isReaderIdle && (
+                      <div className="bg-yellow-500 text-black px-4 py-2.5 rounded-xl border border-yellow-600/20 shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <AlertCircle className="w-4 h-4 text-black animate-bounce" />
+                        <span className="text-sm font-semibold">{t.idlePaused}</span>
                       </div>
                     )}
-                    <button onClick={togglePlay} className="bg-black/90 text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 hover:bg-black transition-colors shadow-xl">
-                      <Pause className="w-4 h-4 fill-current" /> Pause Reading
+
+                    {/* 2. Capped Notice */}
+                    {isPageCostCapped && (
+                      <div className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl border border-emerald-600/20 shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <CheckCircle2 className="w-4 h-4 text-white" />
+                        <span className="text-sm font-semibold">{t.paymentCapped}</span>
+                      </div>
+                    )}
+
+                    {/* 3. Re-reading Notice */}
+                    {!isPageNew && !isPageCostCapped && (
+                      <div className="bg-white text-black px-4 py-2 rounded-full border border-black/10 shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <span className="text-sm font-medium">{t.rereadingFree}</span>
+                      </div>
+                    )}
+
+                    <button onClick={togglePlay} className="bg-black/90 text-white px-6 py-3 rounded-full font-semibold flex items-center gap-2 hover:bg-black transition-colors shadow-xl cursor-pointer">
+                      <Pause className="w-4 h-4 fill-current" /> {t.pauseReading}
                     </button>
                   </div>
                 )}
@@ -297,24 +601,24 @@ export default function CoursePlayerPage() {
                     <button 
                       onClick={handlePrevPage}
                       disabled={currentPage === 0}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-black/60 hover:text-black hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-black/60 hover:text-black hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
                     >
-                      <ChevronLeft className="w-4 h-4" /> Previous
+                      <ChevronLeft className="w-4 h-4" /> {t.back}
                     </button>
                     <span className="text-sm font-mono text-black/40">Page {currentPage + 1} of {ebookPages.length}</span>
                     <button 
                       onClick={handleNextPage}
                       disabled={currentPage === ebookPages.length - 1}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-black/60 hover:text-black hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-black/60 hover:text-black hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
                     >
-                      Next <ChevronRight className="w-4 h-4" />
+                      {t.continue} <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               </div>
             )}
             
-            {/* Large Center Play Button (Visible when paused, only for media) */}
+            {/* Large Center Play Button */}
             {!isPlaying && course.type !== 'ebook' && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                 <button 
@@ -333,7 +637,7 @@ export default function CoursePlayerPage() {
             {course.type !== 'ebook' && (
               <div 
                 className={`absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 pt-24 transition-opacity duration-300 ${isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}
-                onClick={(e) => e.stopPropagation()} // Prevent toggling when interacting with controls
+                onClick={(e) => e.stopPropagation()}
               >
                 
                 {/* Timeline */}
@@ -344,7 +648,6 @@ export default function CoursePlayerPage() {
                   >
                     <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-[0_0_10px_rgba(0,212,200,0.5)] opacity-0 group-hover/timeline:opacity-100 transition-opacity" />
                   </div>
-                  {/* Invisible Range Input for Drag-Scrubbing */}
                   <input 
                     type="range"
                     min="0"
@@ -355,7 +658,6 @@ export default function CoursePlayerPage() {
                       const percentage = Number(e.target.value) / 100;
                       if (mediaRef.current && course.type !== 'ebook') {
                         mediaRef.current.currentTime = percentage * mediaRef.current.duration;
-                        // Optimistically update progress for smooth dragging
                         setProgress(Number(e.target.value));
                       }
                     }}
@@ -366,10 +668,10 @@ export default function CoursePlayerPage() {
                 {/* Controls Container */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-6">
-                    <button onClick={togglePlay} className="text-white hover:text-primary transition-colors z-10">
+                    <button onClick={togglePlay} className="text-white hover:text-primary transition-colors z-10 cursor-pointer">
                       {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
                     </button>
-                    <button onClick={toggleMute} className="text-white hover:text-primary transition-colors z-10">
+                    <button onClick={toggleMute} className="text-white hover:text-primary transition-colors z-10 cursor-pointer">
                       {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
                     </button>
                     <span className="text-xs font-mono text-white/70 flex items-center gap-3">
@@ -387,13 +689,13 @@ export default function CoursePlayerPage() {
                   <div className="flex items-center gap-6">
                     <button 
                       onClick={(e) => { e.stopPropagation(); alert('Settings coming in Phase 2!'); }} 
-                      className="text-white hover:text-primary transition-colors"
+                      className="text-white hover:text-primary transition-colors cursor-pointer"
                     >
                       <Settings className="w-5 h-5" />
                     </button>
                     <button 
                       onClick={toggleFullscreen} 
-                      className="text-white hover:text-primary transition-colors"
+                      className="text-white hover:text-primary transition-colors cursor-pointer"
                     >
                       <Maximize className="w-5 h-5" />
                     </button>
@@ -408,28 +710,28 @@ export default function CoursePlayerPage() {
             
             {/* Course Title & Instructor */}
             <div className="space-y-4">
-              <h2 className="text-3xl font-bold tracking-tight">1. {course.modules[0].title}</h2>
+              <h2 className="text-3xl font-bold tracking-tight">1. {(course as any).modules[0].title}</h2>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-6">
                 <div className="flex items-center gap-4 text-sm text-muted">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs">{course.instructor[0]}</div>
                   <span className="text-foreground font-medium">{course.instructor}</span>
                   <span>•</span>
-                  <span>Rate: ${course.rate}/min</span>
+                  <span>Rate: ${course.rate}/{t.min}</span>
                 </div>
                 
                 {/* AI Language Selector */}
                 <div className="flex items-center gap-3">
-                  {language !== "Original (English)" && (
+                  {playerLanguage !== "Original (English)" && (
                     <span className="flex items-center gap-1.5 text-xs font-medium text-[#c084fc] bg-[#c084fc]/10 px-2.5 py-1 rounded-full border border-[#c084fc]/20 animate-in fade-in zoom-in duration-300">
                       <Sparkles className="w-3.5 h-3.5" />
-                      AI Translated
+                      {t.aiTranslated}
                     </span>
                   )}
                   <div className="relative">
                     <Globe2 className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <select 
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
+                      value={playerLanguage}
+                      onChange={(e) => setPlayerLanguage(e.target.value)}
                       className="pl-9 pr-8 py-2 bg-[#0A0A0A] border border-white/10 rounded-lg text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors appearance-none cursor-pointer hover:bg-white/5"
                     >
                       <option value="Original (English)">English (Original)</option>
@@ -453,28 +755,25 @@ export default function CoursePlayerPage() {
                  <div className="flex items-center justify-between">
                    <h3 className="text-xs uppercase tracking-widest font-semibold text-primary flex items-center gap-2">
                      <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse shadow-[0_0_8px_rgba(0,212,200,0.8)]" />
-                     Live Payment Split
+                     {t.liveEscrow}
                    </h3>
-                   <span className="font-mono text-sm text-foreground">Total Streamed: ${(totalStreamed).toFixed(4)}</span>
+                   <span className="font-mono text-sm text-foreground">{t.totalStreamed}: ${(totalStreamed).toFixed(4)}</span>
                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* 80% Creator */}
                     <div className="p-4 rounded-lg bg-[#0A0A0A] border border-white/5 relative overflow-hidden group hover:border-primary/30 transition-colors">
-                      <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-5 transition-opacity">
-                        <Activity className="w-16 h-16 text-primary" />
-                      </div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted mb-1">Creator (80%)</p>
+                      <p className="text-[10px] uppercase tracking-wider text-muted mb-1">{t.creatorShare}</p>
                       <p className="font-mono text-lg text-foreground relative z-10">${(totalStreamed * 0.80).toFixed(4)}</p>
                     </div>
                     {/* 15% Platform */}
                     <div className="p-4 rounded-lg bg-[#0A0A0A] border border-white/5 hover:border-white/10 transition-colors">
-                      <p className="text-[10px] uppercase tracking-wider text-muted mb-1">Rheodemy (15%)</p>
+                      <p className="text-[10px] uppercase tracking-wider text-muted mb-1">{t.platformShare}</p>
                       <p className="font-mono text-lg text-foreground">${(totalStreamed * 0.15).toFixed(4)}</p>
                     </div>
                     {/* 5% NGO */}
                     <div className="p-4 rounded-lg bg-[#0A0A0A] border border-white/5 hover:border-white/10 transition-colors">
-                      <p className="text-[10px] uppercase tracking-wider text-muted mb-1">Bursary Fund (5%)</p>
+                      <p className="text-[10px] uppercase tracking-wider text-muted mb-1">{t.bursaryShare}</p>
                       <p className="font-mono text-lg text-foreground">${(totalStreamed * 0.05).toFixed(4)}</p>
                     </div>
                  </div>
@@ -487,12 +786,11 @@ export default function CoursePlayerPage() {
         {/* Sidebar Modules */}
         <div className="w-full lg:w-96 border-l border-white/5 bg-[#0A0A0A] flex flex-col h-[calc(100vh-64px)] lg:sticky lg:top-16">
           <div className="p-6 border-b border-white/5">
-            <h3 className="font-semibold text-sm uppercase tracking-wider text-foreground">Course Modules</h3>
+            <h3 className="font-semibold text-sm uppercase tracking-wider text-foreground">{t.courseModules}</h3>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            
-            {course.modules.map((module, index) => (
+            {((course as any).modules || []).map((module: any, index: number) => (
               <div 
                 key={module.id} 
                 className={`p-3 rounded-lg flex gap-4 cursor-pointer group transition-colors ${
@@ -520,7 +818,6 @@ export default function CoursePlayerPage() {
                  </div>
               </div>
             ))}
-
           </div>
         </div>
 

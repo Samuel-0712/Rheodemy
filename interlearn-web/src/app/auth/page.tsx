@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Phone, ArrowRight, Lock, User } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useLanguage } from "@/context/LanguageContext";
 
-export default function AuthPage() {
+function AuthPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams?.get("role") || "learner";
+  const { t } = useLanguage();
   
   const [isLogin, setIsLogin] = useState(false);
   const [useEmail, setUseEmail] = useState(true);
@@ -30,19 +32,17 @@ export default function AuthPage() {
           <div className="relative z-10">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold mb-2">
-                {isLogin ? "Welcome back" : "Create an account"}
+                {isLogin ? t.welcomeBack : t.createAccount}
               </h1>
               <p className="text-foreground/60">
-                {isLogin
-                  ? "Enter your details to access your dashboard"
-                  : "Join Rheodemy and start your journey"}
+                {isLogin ? t.authDescLogin : t.authDescSignup}
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-foreground/80 pl-1">Full Name</label>
+                  <label className="text-sm font-medium text-foreground/80 pl-1">{t.fullName}</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                       <User className="w-5 h-5 text-foreground/40" />
@@ -60,7 +60,7 @@ export default function AuthPage() {
               <div className="space-y-1">
                 <div className="flex justify-between items-center pl-1 pr-1">
                   <label className="text-sm font-medium text-foreground/80">
-                    {useEmail ? "Email Address" : "Phone Number"}
+                    {useEmail ? t.emailAddr : t.phoneNum}
                   </label>
                   <button
                     type="button"
@@ -88,7 +88,7 @@ export default function AuthPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium text-foreground/80 pl-1">Password</label>
+                <label className="text-sm font-medium text-foreground/80 pl-1">{t.password}</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <Lock className="w-5 h-5 text-foreground/40" />
@@ -107,26 +107,48 @@ export default function AuthPage() {
                   type="submit"
                   className="w-full flex items-center justify-center gap-2 py-3.5 bg-primary text-primary-foreground rounded-xl font-semibold hover:opacity-90 transition-opacity"
                 >
-                  {isLogin ? "Sign In" : "Continue to Verification"}
-                  <ArrowRight className="w-5 h-5" />
+                  {isLogin ? t.signIn : t.continueVerify}
+                  <ArrowRight className="w-5 h-5 rtl:rotate-180" />
                 </button>
               </div>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-foreground/60 text-sm">
-                {isLogin ? "Don't have an account? " : "Already have an account? "}
-                <button
-                  onClick={() => setIsLogin(!isLogin)}
-                  className="text-primary font-semibold hover:underline focus:outline-none"
-                >
-                  {isLogin ? "Sign up" : "Log in"}
-                </button>
+                {isLogin ? (
+                  <>
+                    {t.dontHaveAcc.split("?")[0]}?{" "}
+                    <button
+                      onClick={() => setIsLogin(false)}
+                      className="text-primary font-semibold hover:underline focus:outline-none"
+                    >
+                      {t.dontHaveAcc.split("?")[1] || "Sign up"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {t.alreadyHaveAcc.split("?")[0]}?{" "}
+                    <button
+                      onClick={() => setIsLogin(true)}
+                      className="text-primary font-semibold hover:underline focus:outline-none"
+                    >
+                      {t.alreadyHaveAcc.split("?")[1] || "Log in"}
+                    </button>
+                  </>
+                )}
               </p>
             </div>
           </div>
         </div>
       </motion.div>
     </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted">Loading authentication...</div>}>
+      <AuthPageContent />
+    </Suspense>
   );
 }

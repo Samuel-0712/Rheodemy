@@ -3,9 +3,11 @@
 import { motion } from "framer-motion";
 import { BookOpen, Video, ArrowRight, UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function RoleSelection() {
   const router = useRouter();
+  const { t } = useLanguage();
 
   const handleSelectRole = (role: "learner" | "creator") => {
     if (typeof window !== 'undefined') {
@@ -29,10 +31,10 @@ export default function RoleSelection() {
             </div>
           </div>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
-            How will you use <span className="text-primary font-serif">Rheodemy</span>?
+            {t.howUse}
           </h1>
           <p className="text-lg text-foreground/70 max-w-xl mx-auto">
-            Choose your primary role to customize your dashboard. Don't worry, you can always switch roles later.
+            {t.howUseDesc}
           </p>
         </div>
 
@@ -52,13 +54,13 @@ export default function RoleSelection() {
               <BookOpen className="w-8 h-8" />
             </div>
             
-            <h2 className="text-2xl font-bold mb-3 relative z-10">I want to Learn</h2>
+            <h2 className="text-2xl font-bold mb-3 relative z-10">{t.learnTitle}</h2>
             <p className="text-foreground/70 mb-8 relative z-10 flex-1">
-              Access thousands of verified teachers, pay only for what you watch, and manage your learning budget easily.
+              {t.learnDesc}
             </p>
             
             <div className="flex items-center text-primary font-semibold relative z-10 group-hover:translate-x-2 transition-transform">
-              Join as a Learner <ArrowRight className="ml-2 w-5 h-5" />
+              {t.learnBtn} <ArrowRight className="ml-2 w-5 h-5 rtl:rotate-180" />
             </div>
           </motion.div>
 
@@ -77,13 +79,13 @@ export default function RoleSelection() {
               <Video className="w-8 h-8" />
             </div>
             
-            <h2 className="text-2xl font-bold mb-3 relative z-10">I want to Teach</h2>
+            <h2 className="text-2xl font-bold mb-3 relative z-10">{t.teachTitle}</h2>
             <p className="text-foreground/70 mb-8 relative z-10 flex-1">
-              Upload courses, set your price, and earn in real-time as students learn. Protected by our secure escrow system.
+              {t.teachDesc}
             </p>
             
             <div className="flex items-center text-warning font-semibold relative z-10 group-hover:translate-x-2 transition-transform">
-              Join as a Creator <ArrowRight className="ml-2 w-5 h-5" />
+              {t.teachBtn} <ArrowRight className="ml-2 w-5 h-5 rtl:rotate-180" />
             </div>
           </motion.div>
         </div>

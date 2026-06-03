@@ -1,7 +1,14 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, PlayCircle, Wallet, Layers, ShieldCheck, Sparkles, ChevronRight, BookOpen, Headphones } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function MarketingLandingPage() {
+  const { t } = useLanguage();
+  const [showDemoVideo, setShowDemoVideo] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#050505] text-foreground flex flex-col relative overflow-hidden font-sans selection:bg-primary/30">
       
@@ -17,10 +24,10 @@ export default function MarketingLandingPage() {
         </Link>
         <div className="flex items-center gap-4 sm:gap-6">
           <Link href="/auth" className="text-sm font-semibold text-muted hover:text-foreground transition-colors hidden sm:block">
-            Log In
+            {t.logIn}
           </Link>
           <Link href="/become-creator" className="text-sm font-bold text-foreground bg-white/5 hover:bg-white/10 border border-white/10 px-5 py-2.5 rounded-full transition-all flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" /> Become a Creator
+            <Sparkles className="w-4 h-4 text-primary" /> {t.becomeCreator}
           </Link>
         </div>
       </header>
@@ -33,21 +40,24 @@ export default function MarketingLandingPage() {
           </div>
           
           <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[1.1] animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-100">
-            Learn without borders. <br className="hidden md:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">Pay by the second.</span>
+            {t.landingTitle} <br className="hidden md:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">{t.landingTitleHighlight}</span>
           </h1>
           
           <p className="text-lg sm:text-xl text-muted max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-            The world's first Web Monetization educational marketplace. No subscriptions. No ads. Just pure knowledge streamed directly to you, paying creators exactly what their content is worth.
+            {t.landingSubtitle}
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
             <Link href="/onboarding" className="w-full sm:w-auto px-8 py-4 bg-primary text-black font-bold text-lg rounded-full hover:bg-primary/90 hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(0,212,200,0.3)]">
-              Start Learning Now <ArrowRight className="w-5 h-5" />
+              {t.landingCTA} <ArrowRight className="w-5 h-5 rtl:rotate-180" />
             </Link>
-            <Link href="/auth" className="w-full sm:w-auto px-8 py-4 bg-white/5 text-foreground font-bold text-lg rounded-full hover:bg-white/10 transition-colors border border-white/10 flex items-center justify-center gap-2">
-              <PlayCircle className="w-5 h-5" /> Watch Demo
-            </Link>
+            <button 
+              onClick={() => setShowDemoVideo(true)}
+              className="w-full sm:w-auto px-8 py-4 bg-white/5 text-foreground font-bold text-lg rounded-full hover:bg-white/10 transition-colors border border-white/10 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <PlayCircle className="w-5 h-5 text-primary" /> {t.landingWatchDemo}
+            </button>
           </div>
         </div>
 
@@ -88,8 +98,8 @@ export default function MarketingLandingPage() {
       <section className="py-24 sm:py-32 relative z-10 px-6 border-t border-white/5 bg-black/50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-3xl mx-auto mb-20">
-            <h2 className="text-3xl sm:text-5xl font-bold mb-6">How Rheodemy Works</h2>
-            <p className="text-lg text-muted">A paradigm shift in education economics. No upfront fees, no locked ecosystems.</p>
+            <h2 className="text-3xl sm:text-5xl font-bold mb-6">{t.howItWorks}</h2>
+            <p className="text-lg text-muted">{t.howItWorksDesc}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -97,9 +107,9 @@ export default function MarketingLandingPage() {
               <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Wallet className="w-7 h-7 text-blue-400" />
               </div>
-              <h3 className="text-xl font-bold mb-3">1. Connect ILP Wallet</h3>
+              <h3 className="text-xl font-bold mb-3">{t.feature1Title}</h3>
               <p className="text-muted leading-relaxed">
-                Deposit funds into your secure Interledger wallet. It handles the micropayments so you never have to worry about credit card fees or currency conversions.
+                {t.feature1Desc}
               </p>
             </div>
             
@@ -107,9 +117,9 @@ export default function MarketingLandingPage() {
               <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Layers className="w-7 h-7 text-primary" />
               </div>
-              <h3 className="text-xl font-bold mb-3">2. Omni-Content Learning</h3>
+              <h3 className="text-xl font-bold mb-3">{t.feature2Title}</h3>
               <p className="text-muted leading-relaxed">
-                Whether you prefer visually rich Videos, deep-dive Ebooks, or on-the-go Audio Podcasts, our unified player adapts to your learning style.
+                {t.feature2Desc}
               </p>
             </div>
 
@@ -117,9 +127,9 @@ export default function MarketingLandingPage() {
               <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <ShieldCheck className="w-7 h-7 text-emerald-400" />
               </div>
-              <h3 className="text-xl font-bold mb-3">3. Pay As You Go</h3>
+              <h3 className="text-xl font-bold mb-3">{t.feature3Title}</h3>
               <p className="text-muted leading-relaxed">
-                Smart Contracts ensure the meter only runs when you are actively consuming *new* content. Rewatching or rereading is always 100% free.
+                {t.feature3Desc}
               </p>
             </div>
           </div>
@@ -132,12 +142,12 @@ export default function MarketingLandingPage() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/20 blur-[100px] rounded-full pointer-events-none" />
           
           <div className="relative z-10">
-            <h2 className="text-4xl sm:text-5xl font-bold mb-6">Earn exactly what your knowledge is worth.</h2>
+            <h2 className="text-4xl sm:text-5xl font-bold mb-6">{t.creatorSectionTitle}</h2>
             <p className="text-xl text-foreground/80 max-w-2xl mx-auto mb-10">
-              Stop waiting 30 days for payout minimums. Keep <strong className="text-primary">80%</strong> of your revenue, streamed directly to your wallet every single second a student learns from you.
+              {t.creatorSectionDesc}
             </p>
             <Link href="/become-creator" className="inline-flex items-center gap-2 px-8 py-4 bg-foreground text-background font-bold text-lg rounded-full hover:opacity-90 hover:scale-105 transition-all shadow-xl">
-              Join the Creator Program <ChevronRight className="w-5 h-5" />
+              {t.creatorSectionBtn} <ChevronRight className="w-5 h-5 rtl:rotate-180" />
             </Link>
           </div>
         </div>
@@ -157,6 +167,51 @@ export default function MarketingLandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Cinematic Walkthrough Video Modal */}
+      {showDemoVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-300">
+          <div className="relative w-full max-w-4xl bg-[#0A0A0A] border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-8 duration-500">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-white/5 bg-black/40">
+              <h3 className="font-semibold text-lg flex items-center gap-2 text-foreground">
+                <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                Rheodemy MVP Product Walkthrough
+              </h3>
+              <button 
+                onClick={() => setShowDemoVideo(false)}
+                className="text-muted hover:text-foreground text-sm font-semibold bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full transition-colors cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Video Content */}
+            <div className="aspect-video bg-black flex items-center justify-center p-2">
+              <video 
+                className="w-full h-full rounded-2xl object-cover" 
+                src="https://www.w3schools.com/html/mov_bbb.mp4" 
+                controls 
+                autoPlay
+                playsInline
+              />
+            </div>
+
+            {/* Modal Footer Info */}
+            <div className="p-6 bg-black/40 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-muted">
+              <p>Demonstrating: Pay-by-the-second Ebook reading, active scroll detection, and 80/15/5 smart escrow splits.</p>
+              <Link 
+                href="/onboarding" 
+                className="px-6 py-2.5 bg-primary text-black font-bold rounded-full hover:bg-primary/90 hover:scale-105 transition-all text-center"
+                onClick={() => setShowDemoVideo(false)}
+              >
+                {t.landingCTA}
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
