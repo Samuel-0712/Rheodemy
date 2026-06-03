@@ -18,7 +18,7 @@ export function Header() {
   }, []);
   
   // Don't show top-left header on the very first screen, inside the dashboard, or creator signup
-  if (pathname === "/" || pathname?.startsWith("/dashboard") || pathname === "/become-creator") return null;
+  if (pathname === "/" || pathname?.startsWith("/dashboard") || pathname === "/become-creator" || pathname === "/onboarding") return null;
   
   return (
     <header className="absolute top-0 left-0 w-full p-4 sm:p-6 flex items-center z-50 pointer-events-none">
