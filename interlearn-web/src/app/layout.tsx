@@ -35,6 +35,7 @@ export const metadata: Metadata = {
 
 import { Header } from "@/components/Header";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { ParticleBackground } from "@/components/ParticleBackground";
 
 export default function RootLayout({
   children,
@@ -46,8 +47,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${ebGaramond.variable} ${jetbrainsMono.variable} ${cormorantGaramond.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col text-foreground relative">
+      <body className="min-h-full flex flex-col text-foreground relative bg-[#050505]">
         <LanguageProvider>
+          <ParticleBackground />
           <Header />
           {children}
         </LanguageProvider>

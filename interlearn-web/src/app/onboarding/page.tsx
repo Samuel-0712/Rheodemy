@@ -5,7 +5,6 @@ import { motion, useAnimation } from "framer-motion";
 import { Globe, CheckCircle2, ChevronRight, Coins, HeartHandshake, BookOpen, Clock, Activity, ArrowDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLanguage, LanguageCode } from "@/context/LanguageContext";
-import { ParticleBackground } from "@/components/ParticleBackground";
 
 const languages = [
   { code: "en", name: "English", region: "Global" },
@@ -56,13 +55,11 @@ export default function OnboardingWalkthrough() {
   };
 
   return (
-    <main className="min-h-screen bg-[#050505] text-foreground flex flex-col relative selection:bg-primary/30">
+    <main className="min-h-screen bg-transparent text-foreground flex flex-col relative selection:bg-primary/30">
       
       {/* Background Ambient Glows */}
       <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/5 blur-[120px] pointer-events-none" />
-
-      <ParticleBackground />
 
       <div className="w-full max-w-4xl mx-auto px-6 relative z-10">
         

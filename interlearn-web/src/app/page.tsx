@@ -4,21 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, PlayCircle, Wallet, Layers, ShieldCheck, Sparkles, ChevronRight, BookOpen, Headphones } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { ParticleBackground } from "@/components/ParticleBackground";
 
 export default function MarketingLandingPage() {
   const { t } = useLanguage();
   const [showDemoVideo, setShowDemoVideo] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-foreground flex flex-col relative overflow-hidden font-sans selection:bg-primary/30">
+    <div className="min-h-screen bg-transparent text-foreground flex flex-col relative overflow-hidden font-sans selection:bg-primary/30">
       
       {/* Background Ambient Glows */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[120px] pointer-events-none" />
       <div className="absolute top-[40%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/10 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[40%] rounded-full bg-emerald-500/5 blur-[120px] pointer-events-none" />
-
-      <ParticleBackground />
 
       {/* Navigation */}
       <header className="absolute top-0 inset-x-0 h-24 z-50 flex items-center justify-between px-6 md:px-12 max-w-7xl mx-auto w-full">
